@@ -46,10 +46,12 @@ def process():
         raw = str(payload.get('text', '')).replace('\xa0', ' ').strip()
         
         if not raw: 
-            return make_response(json.dumps([]), 200)
+            # silent: return make_response(json.dumps([]), 200)
+            return make_response(json.dumps({"debug_error": "No text received in payload"}), 200)
         
         segments = [s.strip() for s in raw.split('|') if 'Content:' in s]
         bkd_map, fnd_map = {}, {}
+        skipped_blocks = []
 
         for seg in segments:
             try:
