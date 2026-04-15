@@ -66,6 +66,20 @@ def extract_viewing_date(v_str, anchor_date):
 
 @app.route('/process', methods=['POST'])
 def process():
+    try:
+        req_data = request.get_json(force=True)
+    except Exception:
+        return make_response(json.dumps({"error": "Invalid JSON format from Shortcut"}), 400)
+
+    if not req_data or 'text' not in req_data:
+        return make_response(json.dumps({"error": "Missing 'text' key in JSON"}), 400)
+
+    raw_text = req_data.get('text', '')
+    if not isinstance(raw_text, str):
+        return make_response(json.dumps({"error": "'text' field must be a string"}), 400)
+
+    raw_text = raw_text.replace('\xa0', ' ').strip()
+    
     req_data = request.get_json(force=True)
     raw_text = req_data.get('text', '').replace('\xa0', ' ').strip()
     segments = [s.strip() for s in raw_text.split('|') if s.strip()]
