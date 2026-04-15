@@ -44,29 +44,43 @@ def process():
     try:
         payload = request.get_json(force=True)
         raw = str(payload.get('text', '')).replace('\xa0', ' ').strip()
-        if not raw: return "[]"
+        
+        # Initial check: did we even get text?
+        if not raw: 
+            return make_response(json.dumps({"debug_error": "No text received in payload"}), 200)
         
         segments = [s.strip() for s in raw.split('|') if 'Content:' in s]
         bkd_map, fnd_map = {}, {}
+        skipped_blocks = []
 
         for seg in segments:
-            # Extract core fields using simple splits for speed
             try:
                 content_split = seg.split('Content:', 1)
+                if len(content_split) < 2:
+                    skipped_blocks.append("Split failed: No 'Content:' marker found")
+                    continue
+                
                 meta, body = content_split[0], content_split[1]
                 
-                src = re.search(r'Source:\s*(\S+)', meta, re.I).group(1)
-                st_dt = datetime.strptime(re.search(r'Status:\s*(\d{4}-\d{2}-\d{2})', meta, re.I).group(1), '%Y-%m-%d').date()
-                anc = re.search(r'Anchor:\s*([\d-T:+]+)', meta, re.I).group(1)
+                # Use flexible regex for metadata
+                src_match = re.search(r'Source:\s*(\S+)', meta, re.I)
+                st_match = re.search(r'Status:\s*(\d{4}-\d{2}-\d{2})', meta, re.I)
+                anc_match = re.search(r'Anchor:\s*([\d-T:+]+)', meta, re.I)
+
+                if not all([src_match, st_match, anc_match]):
+                    skipped_blocks.append(f"Meta missing: Src={bool(src_match)}, St={bool(st_match)}, Anc={bool(anc_match)}")
+                    continue
+
+                src = src_match.group(1)
+                st_dt = datetime.strptime(st_match.group(1), '%Y-%m-%d').date()
+                anc = anc_match.group(1)
                 anc_dt = datetime.strptime(anc[:10], '%Y-%m-%d').date()
 
                 toks = fast_parse(body)
                 addr = quick_addr(toks)
                 
-                # Simple date check
                 v_str = toks.get('viewing', '').lower()
                 v_date = None
-                # Basic numeric date check
                 dm = re.search(r'(\d{1,2})[/-](\d{1,2})', v_str)
                 if dm: v_date = datetime(anc_dt.year, int(dm.group(2)), int(dm.group(1))).date()
                 elif "tomorrow" in v_str: v_date = anc_dt + timedelta(days=1)
@@ -74,23 +88,33 @@ def process():
 
                 flag = "PAST" if v_date and v_date < st_dt else "FUTURE" if v_date else "UNKNOWN"
                 
-                entry = {"anchor": anc, "flag": flag, "must": "must book" in v_str}
-                if "2Booked" in src: bkd_map.setdefault(addr, []).append(entry)
-                else: fnd_map.setdefault(addr, []).append(entry)
-            except: continue
+                entry = {"anchor": anc, "flag": flag, "addr_generated": addr, "v_date": str(v_date)}
+                
+                if "2Booked" in src:
+                    bkd_map.setdefault(addr, []).append(entry)
+                else:
+                    fnd_map.setdefault(addr, []).append(entry)
+            except Exception as e:
+                skipped_blocks.append(f"Logic Error: {str(e)}")
+                continue
 
-        results = []
-        for addr, b_list in bkd_map.items():
-            if all(b['flag'] == "PAST" for b in b_list):
-                f_list = fnd_map.get(addr, [])
-                if f_list:
-                    # Filter: if multiple found, take "must book"
-                    match_f = [f for f in f_list if f['must']] if len(f_list) > 1 else f_list
-                    results.append({"bkd_anchors": [b['anchor'] for b in b_list], "fnd_anchors": [f['anchor'] for f in match_f]})
+        # THE DEBUG REPORT
+        debug_report = {
+            "summary": {
+                "total_segments_found": len(segments),
+                "booked_count": len(bkd_map),
+                "found_count": len(fnd_map),
+                "errors_encountered": len(skipped_blocks)
+            },
+            "addresses_in_booked": list(bkd_map.keys()),
+            "addresses_in_found": list(fnd_map.keys()),
+            "error_log": skipped_blocks[:5] # Show first 5 errors
+        }
 
-        return make_response(json.dumps(results), 200, {"Content-Type": "application/json"})
+        return make_response(json.dumps(debug_report), 200, {"Content-Type": "application/json"})
+
     except Exception as e:
-        return make_response(json.dumps([{"error": str(e)}]), 200)
+        return make_response(json.dumps({"fatal_crash": str(e)}), 200)
 
 if __name__ == "__main__":
     app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
