@@ -66,46 +66,79 @@ def extract_viewing_date(v_str, anchor_date):
 
 @app.route('/process', methods=['POST'])
 def process():
+    # 1. Cautious JSON Loading
     try:
         req_data = request.get_json(force=True)
+        if not req_data:
+            return make_response(json.dumps([]), 200)
+        raw_text = req_data.get('text', '')
     except Exception:
-        return make_response(json.dumps({"error": "Invalid JSON format from Shortcut"}), 400)
+        return make_response(json.dumps([]), 200)
 
-    if not req_data or 'text' not in req_data:
-        return make_response(json.dumps({"error": "Missing 'text' key in JSON"}), 400)
-
-    raw_text = req_data.get('text', '')
-    if not isinstance(raw_text, str):
-        return make_response(json.dumps({"error": "'text' field must be a string"}), 400)
-
-    raw_text = raw_text.replace('\xa0', ' ').strip()
-    
-    req_data = request.get_json(force=True)
-    raw_text = req_data.get('text', '').replace('\xa0', ' ').strip()
+    # 2. Cleanup
+    raw_text = str(raw_text).replace('\xa0', ' ').replace('\u202f', ' ').strip()
     segments = [s.strip() for s in raw_text.split('|') if s.strip()]
-    bkd_list, fnd_list = [], []
+    
+    bkd_list = []
+    fnd_list = []
+
     for seg in segments:
-        src_m, st_m = re.search(r'Source:\s*(.*)', seg, re.I), re.search(r'Status:\s*(\d{4}-\d{2}-\d{2})', seg, re.I)
-        a_m, c_m = re.search(r'Anchor:\s*([\d-T:+]+)', seg, re.I), re.search(r'Content:\s*(.*)', seg, re.I | re.S)
-        if all([src_m, st_m, a_m, c_m]):
-            status_dt = datetime.strptime(st_m.group(1), '%Y-%m-%d').date()
-            anchor_ts = a_m.group(1).strip()
-            anchor_dt = datetime.fromisoformat(anchor_ts).date()
-            toks = parse_content(c_m.group(1).strip())
-            v_date = extract_viewing_date(toks.get('viewing', ''), anchor_dt)
-            flag = "PAST" if v_date and v_date < status_dt else "TODAY" if v_date == status_dt else "FUTURE" if v_date else "UNKNOWN"
-            obj = {"anchor": anchor_ts, "address": format_address(toks), "tokens": toks, "dayflag": flag}
-            if "2Booked" in src_m.group(1): bkd_list.append(obj)
-            else: fnd_list.append(obj)
-    b_groups, f_groups = {}, {}
-    for n in bkd_list: b_groups.setdefault(n['address'], []).append(n)
-    for n in fnd_list: f_groups.setdefault(n['address'], []).append(n)
+        try:
+            src_m = re.search(r'Source:\s*(\S+)', seg, re.I)
+            st_m = re.search(r'Status:\s*(\d{4}-\d{2}-\d{2})', seg, re.I)
+            a_m = re.search(r'Anchor:\s*([\d-T:+]+)', seg, re.I)
+            c_m = re.search(r'Content:\s*(.*)', seg, re.I | re.S)
+
+            if all([src_m, st_m, a_m, c_m]):
+                src_type = src_m.group(1)
+                status_dt = datetime.strptime(st_m.group(1), '%Y-%m-%d').date()
+                
+                # REPLACEMENT: Safer date parsing for older Python versions
+                anchor_str = a_m.group(1).split('+')[0].split('Z')[0] 
+                anchor_dt = datetime.strptime(anchor_str[:10], '%Y-%m-%d').date()
+                
+                toks = parse_content(c_m.group(1).strip())
+                v_date = extract_viewing_date(toks.get('viewing', ''), anchor_dt)
+                
+                flag = "UNKNOWN"
+                if v_date:
+                    if v_date < status_dt: flag = "PAST"
+                    elif v_date == status_dt: flag = "TODAY"
+                    else: flag = "FUTURE"
+                
+                obj = {"anchor": a_m.group(1), "address": format_address(toks), "tokens": toks, "dayflag": flag}
+                
+                if "2Booked" in src_type:
+                    bkd_list.append(obj)
+                else:
+                    fnd_list.append(obj)
+        except:
+            continue
+
+    # 3. Aggressive Comparison logic
     results = []
+    b_groups = {}
+    for n in bkd_list:
+        b_groups.setdefault(n['address'], []).append(n)
+        
+    f_groups = {}
+    for n in fnd_list:
+        f_groups.setdefault(n['address'], []).append(n)
+
     for addr, group in b_groups.items():
         if all(n['dayflag'] == "PAST" for n in group):
             f_matches = f_groups.get(addr, [])
-            valid_f = f_matches if len(f_matches) == 1 else [n for n in f_matches if "must book" in n['tokens'].get('viewing', '').lower()]
-            results.append({"bkd_anchors": [n['anchor'] for n in group], "fnd_anchors": [n['anchor'] for n in valid_f] if valid_f else []})
+            valid_f = []
+            if len(f_matches) == 1:
+                valid_f = f_matches
+            elif len(f_matches) > 1:
+                valid_f = [n for n in f_matches if "must book" in n['tokens'].get('viewing', '').lower()]
+            
+            results.append({
+                "bkd_anchors": [n['anchor'] for n in group],
+                "fnd_anchors": [n['anchor'] for n in valid_f] if valid_f else []
+            })
+
     return make_response(json.dumps(results), 200, {"Content-Type": "application/json"})
 
 if __name__ == "__main__":
