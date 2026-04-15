@@ -35,7 +35,7 @@ def quick_addr(t):
     full = f"{pre} {t.get('beside','')} {t.get('suburb','')}"
     full = re.sub(r'\s+', ' ', full).strip().title()
     # Basic abbreviations
-    subs = {'Road':'Rd.','Street':'St.','Cresent':'Cres.','Place':'Pl.','Avenue':'Ave.','Lane':'Ln.','Highway':'Hwy.','Way':'Wy.'}
+    subs = {'Road':'Rd.','Street':'St.','Crescent':'Cres.','Place':'Pl.','Avenue':'Ave.','Lane':'Ln.','Highway':'Hwy.','Way':'Wy.'}
     for k, v in subs.items(): full = full.replace(k, v)
     return full
 
