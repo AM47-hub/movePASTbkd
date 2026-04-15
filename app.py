@@ -60,28 +60,20 @@ def process():
                 
                 src_match = re.search(r'Source:\s*(\S+)', meta, re.I)
                 st_match = re.search(r'Status:\s*(\d{4}-\d{2}-\d{2})', meta, re.I)
-                # FIXED REGEX: The hyphen is now at the start [-...] to avoid range errors
                 anc_match = re.search(r'Anchor:\s*([\d\-T:+]+)', meta, re.I)
 
-                # Extract clean date strings from the metadata dictionary 'd' or matches
-                st_str = d.get('status', '').strip()
-                anc_raw = d.get('anchor', '').strip()
-                
-                # FIX: Split the Anchor at 'T' to isolate the YYYY-MM-DD
-                anc_clean = anc_raw.split('T')[0]
-
-                # Convert to Python date objects safely
-                st_dt = datetime.strptime(st_str, '%Y-%m-%d').date()
-                anc_dt = datetime.strptime(anc_clean, '%Y-%m-%d').date()
-                
                 if not all([src_match, st_match, anc_match]):
                     continue
 
                 src = src_match.group(1)
-                st_dt = datetime.strptime(st_match.group(1), '%Y-%m-%d').date()
-                anc = anc_match.group(1)
-                # Ensure we only take the YYYY-MM-DD part for the anchor date
-                anc_dt = datetime.strptime(anc[:10], '%Y-%m-%d').date()
+                st_str = st_match.group(1)
+                anc_raw = anc_match.group(1)
+
+                # Date Splitting Fix
+                anc_clean = anc_raw.split('T')[0]
+
+                st_dt = datetime.strptime(st_str, '%Y-%m-%d').date()
+                anc_dt = datetime.strptime(anc_clean, '%Y-%m-%d').date()
 
                 toks = fast_parse(body)
                 addr = quick_addr(toks)
@@ -95,7 +87,7 @@ def process():
 
                 flag = "PAST" if v_date and v_date < st_dt else "FUTURE" if v_date else "UNKNOWN"
                 
-                entry = {"anchor": anc, "flag": flag, "must": "must book" in v_str}
+                entry = {"anchor": anc_raw, "flag": flag, "must": "must book" in v_str}
                 
                 if "2Booked" in src:
                     bkd_map.setdefault(addr, []).append(entry)
