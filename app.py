@@ -63,6 +63,17 @@ def process():
                 # FIXED REGEX: The hyphen is now at the start [-...] to avoid range errors
                 anc_match = re.search(r'Anchor:\s*([\d\-T:+]+)', meta, re.I)
 
+                # Extract clean date strings from the metadata dictionary 'd' or matches
+                st_str = d.get('status', '').strip()
+                anc_raw = d.get('anchor', '').strip()
+                
+                # FIX: Split the Anchor at 'T' to isolate the YYYY-MM-DD
+                anc_clean = anc_raw.split('T')[0]
+
+                # Convert to Python date objects safely
+                st_dt = datetime.strptime(st_str, '%Y-%m-%d').date()
+                anc_dt = datetime.strptime(anc_clean, '%Y-%m-%d').date()
+                
                 if not all([src_match, st_match, anc_match]):
                     continue
 
