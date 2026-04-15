@@ -54,7 +54,9 @@ def process():
         for seg in segments:
             try:
                 content_split = seg.split('Content:', 1)
-                if len(content_split) < 2: continue
+                if len(content_split) < 2:
+                    skipped_blocks.append("Split failed: No 'Content:' marker found")
+                    continue
                 
                 meta, body = content_split[0], content_split[1]
                 
@@ -63,6 +65,7 @@ def process():
                 anc_match = re.search(r'Anchor:\s*([\d\-T:+]+)', meta, re.I)
 
                 if not all([src_match, st_match, anc_match]):
+                    skipped_blocks.append(f"Meta missing: Src={bool(src_match)}, St={bool(st_match)}, Anc={bool(anc_match)}")
                     continue
 
                 src = src_match.group(1)
