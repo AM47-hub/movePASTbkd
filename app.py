@@ -115,7 +115,8 @@ def process():
             "error_log": skipped_blocks[:5] # Show first 5 errors
         }
 
-        return make_response(json.dumps(results), 200, {"Content-Type": "application/json"})
+        # Silent: return make_response(json.dumps(results), 200, {"Content-Type": "application/json"})
+        return make_response(json.dumps(debug_report), 200, {"Content-Type": "application/json"})
 
     except Exception as e:
         return make_response(json.dumps([{"fatal_crash": str(e)}]), 200)
