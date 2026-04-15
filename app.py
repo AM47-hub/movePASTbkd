@@ -93,19 +93,22 @@ def process():
                     bkd_map.setdefault(addr, []).append(entry)
                 else:
                     fnd_map.setdefault(addr, []).append(entry)
-            except:
+            except Exception as e:
+                skipped_blocks.append(f"Logic Error: {str(e)}")
                 continue
 
-        results = []
-        for addr, b_list in bkd_map.items():
-            if all(b['flag'] == "PAST" for b in b_list):
-                f_list = fnd_map.get(addr, [])
-                if f_list:
-                    match_f = [f for f in f_list if f['must']] if len(f_list) > 1 else f_list
-                    results.append({
-                        "bkd_anchors": [b['anchor'] for b in b_list],
-                        "fnd_anchors": [f['anchor'] for f in match_f]
-                    })
+        # THE DEBUG REPORT
+        debug_report = {
+            "summary": {
+                "total_segments_found": len(segments),
+                "booked_count": len(bkd_map),
+                "found_count": len(fnd_map),
+                "errors_encountered": len(skipped_blocks)
+            },
+            "addresses_in_booked": list(bkd_map.keys()),
+            "addresses_in_found": list(fnd_map.keys()),
+            "error_log": skipped_blocks[:5] # Show first 5 errors
+        }
 
         return make_response(json.dumps(results), 200, {"Content-Type": "application/json"})
 
