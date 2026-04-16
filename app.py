@@ -208,14 +208,14 @@ def process():
                         
                     if match_flag:
                         results.append({
-                            "bkd_anchors": [bflag['created'] for bflag in bkd_list],
-                            "fnd_anchors": [fflag['created'] for fflag in match_flag]
+                            "bkd_anchor": [bflag['created'] for bflag in bkd_list],
+                            "fnd_anchor": [fflag['created'] for fflag in match_flag]
                         })
                 else:
                     # Capture Orphans: BKD exists and is PAST, but no FND match found
                     results.append({
-                        "bkd_anchors": [bflag['created'] for bflag in bkd_list],
-                        "fnd_anchors": []
+                        "bkd_anchor": [bflag['created'] for bflag in bkd_list],
+                        "fnd_anchor": []
                     })
 
         # Silent: THE DEBUG REPORT
