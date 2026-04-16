@@ -44,11 +44,11 @@ def quick_addr(tokens):
         unit = re.sub(rf'\b{word}\b', digit, unit, flags=re.I)
         numb = re.sub(rf'\b{word}\b', digit, numb, flags=re.I)
         
-    unit = unit.replace(" ", "")
-    unit = unit.upper()
-    numb = numb.replace(" ", "")
-    numb = numb.upper()
+    unit = unit.replace(" ", "").upper()
+    numb = numb.replace(" ", "").upper()
     
+
+
     if unit:
         location = f"U{unit}/{numb}"
     else:
@@ -119,20 +119,46 @@ def process():
                     tokens = fast_parse(body)
                     delimit_addr = quick_addr(tokens)
                     
-                    view_string = tokens.get('viewing', '')
-                    view_string = view_string.lower()
-                    
+                    view_string = tokens.get('viewing', '').lower()
+
+
                     view_date = None
+
+                    # --- START MERGED BLUEPRINT DATE LOGIC ---
+                    # Direct Numeric
                     date_actual = re.search(r'(\d{1,2})[/-](\d{1,2})', view_string)
-                    
                     if date_actual: 
                         v_day = int(date_actual.group(1))
                         v_mth = int(date_actual.group(2))
                         view_date = datetime(anchor_dt.year, v_mth, v_day).date()
-                    elif "tomorrow" in view_string: 
-                        view_date = anchor_dt + timedelta(days=1)
-                    elif "today" in view_string: 
-                        view_date = anchor_dt
+
+                    # Absolute Names
+                    if not view_date:
+                        months = {"jan":1,"feb":2,"mar":3,"apr":4,"may":5,"jun":6,"jul":7,"aug":8,"sep":9,"oct":10,"nov":11,"dec":12}
+                        abs_m = re.search(r'(\d+)(?:st|nd|rd|th)?\s*(?:of\s*)?([a-z]{3,})', view_string)
+                        if abs_m:
+                            m_prefix = abs_m.group(2)[:3]
+                            if m_prefix in months:
+                                view_date = datetime(anchor_dt.year, months[m_prefix], int(abs_m.group(1))).date()
+
+                    # Relative Logic
+                    if not view_date:
+                        if "tomorrow" in view_string:
+                            view_date = anchor_dt + timedelta(days=1)
+                        elif any(w in view_string for w in ["today", "this morning", "this afternoon"]):
+                            view_date = anchor_dt
+                        else:
+                            days_idx = {"mon":0, "tue":1, "wed":2, "thu":3, "fri":4, "sat":5, "sun":6}
+                            rel_date = re.search(r'(this|next)?\s*(monday|tuesday|wednesday|thursday|friday|saturday|sunday|mon|tue|wed|thu|fri|sat|sun)', view_string)
+                            if rel_date:
+                                kw, d_name = rel_date.groups()
+                                target_weekday = days_idx[d_name[:3]]
+                                days_ahead = (target_weekday - anchor_dt.weekday()) % 7
+                                if days_ahead == 0: days_ahead = 7
+                                target_date = anchor_dt + timedelta(days=days_ahead)
+                                if kw == 'next' and days_ahead <= 2: target_date += timedelta(days=7)
+                                view_date = target_date
+                    # --- END MERGED BLUEPRINT DATE LOGIC ---
 
                     if view_date and view_date < status_dt:
                        day_flag = "PAST"
@@ -185,17 +211,23 @@ def process():
                             "bkd_anchors": [bflag['created'] for bflag in bkd_list],
                             "fnd_anchors": [fflag['created'] for fflag in match_flag]
                         })
+                else:
+                    # Capture Orphans: BKD exists and is PAST, but no FND match found
+                    results.append({
+                        "bkd_anchors": [bflag['created'] for bflag in bkd_list],
+                        "fnd_anchors": []
+                    })
 
         # Silent: THE DEBUG REPORT
         # Silent: debug_report = {
             # Silent: "summary": {
                 # Silent: "total_notes_found": len(notes),
-                # Silent: "booked_count": len(bkd_group),
-                # Silent: "found_count": len(fnd_group),
+                # Silent: "booked_count": len(bkd_groups),
+                # Silent: "found_count": len(fnd_groups),
                 # Silent: "error_count": len(skipped_blocks)
             # Silent: },
-            # Silent: "addresses_in_booked": list(bkd_group.keys()),
-            # Silent: "addresses_in_found": list(fnd_group.keys()),
+            # Silent: "addresses_in_booked": list(bkd_groups.keys()),
+            # Silent: "addresses_in_found": list(fnd_groups.keys()),
             # Silent: "error_log": skipped_blocks[:5]
         # Silent: }
 
