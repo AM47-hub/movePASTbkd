@@ -33,21 +33,8 @@ def quick_addr(tokens):
     unit = tokens.get('flat', '')
     numb = tokens.get('number', '')
     
-    repairs = {
-        'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 
-        'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'zero': '0', 
-        'to': '2', 'for': '4', 'ate': '8'
-    }
-    
-    for word in repairs:
-        digit = repairs[word]
-        unit = re.sub(rf'\b{word}\b', digit, unit, flags=re.I)
-        numb = re.sub(rf'\b{word}\b', digit, numb, flags=re.I)
-        
     unit = unit.replace(" ", "").upper()
     numb = numb.replace(" ", "").upper()
-    
-
 
     if unit:
         location = f"U{unit}/{numb}"
@@ -56,6 +43,9 @@ def quick_addr(tokens):
         
     beside = tokens.get('beside', '')
     suburb = tokens.get('suburb', '')
+    
+    # Standardize 'beside' by removing 'the' to ensure matching
+    beside = re.sub(r'^the\s+kingsway', 'Kingsway', tokens.get('beside', ''), flags=re.I)
     
     full_addr = location + " " + beside + " " + suburb
     full_addr = re.sub(r'\s+', ' ', full_addr)
@@ -91,13 +81,20 @@ def process():
         fnd_groups = {}
         #Silent: skipped_blocks = []
 
+        # Global repairs dictionary
+        repairs = {
+            'one': '1', 'two': '2', 'three': '3', 'four': '4', 'five': '5', 
+            'six': '6', 'seven': '7', 'eight': '8', 'nine': '9', 'zero': '0', 
+            'to': '2', 'for': '4', 'ate': '8'
+        }
+
         for text in notes:
             try:
                 key_values = text.split('Content:', 1)
                 if len(key_values) < 2:
                     #Silent: skipped_blocks.append("Split failed: No 'Content:' marker found")
                     continue
-                
+
                 meta = key_values[0]
                 body = key_values[1]
                 
@@ -117,10 +114,17 @@ def process():
                     anchor_dt = datetime.strptime(anch_clean, '%Y-%m-%d').date()
 
                     tokens = fast_parse(body)
-                    delimit_addr = quick_addr(tokens)
                     
-                    view_string = tokens.get('viewing', '').lower()
+                    # --- NEW GLOBAL REPAIR LOGIC ---
+                    for key in tokens:
+                        val = tokens[key]
+                        for word, digit in repairs.items():
+                            val = re.sub(rf'\b{word}\b', digit, val, flags=re.I)
+                        tokens[key] = val
+                    # --- END GLOBAL REPAIR LOGIC ---
 
+                    delimit_addr = quick_addr(tokens)
+                    view_string = tokens.get('viewing', '').lower()
 
                     view_date = None
 
@@ -161,7 +165,7 @@ def process():
                     # --- END MERGED BLUEPRINT DATE LOGIC ---
 
                     if view_date and view_date < status_dt:
-                       day_flag = "PAST"
+                        day_flag = "PAST"
                     elif view_date:
                         day_flag = "FUTURE"
                     else:
