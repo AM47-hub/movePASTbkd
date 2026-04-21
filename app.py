@@ -55,7 +55,7 @@ def quick_addr(tokens):
     addr_suffix = {
         'Road': 'Rd.', 'Street': 'St.', 'Crescent': 'Cres.', 
         'Place': 'Pl.', 'Avenue': 'Ave.', 'Lane': 'Ln.', 
-        'Highway': 'Hwy.', 'Way': 'Wy.','Row': 'Rw.', 'Terrace': 'Tce.', 'Drive', 'Dr.'
+        'Highway': 'Hwy.', 'Way': 'Wy.','Row': 'Rw.', 'Terrace': 'Tce.', 'Drive': 'Dr.'
     }
     
     for full_word in addr_suffix:
