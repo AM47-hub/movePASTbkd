@@ -103,7 +103,7 @@ def process():
         fnd_groups = {}
         results = []
 
-    notes = [s.strip() for s in raw.split('|') if 'Content:' in s]
+        notes = [s.strip() for s in raw.split('|') if 'Content:' in s]
         for text in notes:
             try:
                 key_values = text.split('Content:', 1)
