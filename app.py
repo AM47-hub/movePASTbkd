@@ -84,7 +84,7 @@ def quick_addr(tokens):
     full_addr = re.sub(r'\s+', ' ', full_addr).strip().title()
 
     # Apply suffixes using word boundaries to prevent "Broadway" -> "BRd.way"
-    for full_word, abbrev in SUFFIX.items():6
+    for full_word, abbrev in SUFFIX.items():
         full_addr = re.sub(rf'\b{full_word}\b', abbrev, full_addr, flags=re.I)
     return full_addr
 
@@ -103,7 +103,7 @@ def process():
         fnd_groups = {}
         results = []
 
-        notes = [s.strip() for s in raw.split('|') if 'Content:' in s]
+    notes = [s.strip() for s in raw.split('|') if 'Content:' in s]
         for text in notes:
             try:
                 key_values = text.split('Content:', 1)
