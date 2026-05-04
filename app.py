@@ -12,7 +12,7 @@ REPAIRS = {
     'five': '5', 'six': '6',
     'seven': '7', 'eight': '8', 'ate': '8',
     'nine': '9', 'zero': '0', 'none':'0', 'nill':'0',
-    'dash': '-'
+    'dash': '-', '—': '-'
 }
 
 # Address abbreviations
