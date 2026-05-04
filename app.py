@@ -78,7 +78,15 @@ def fast_parse(dictated):
 def quick_addr(tokens):
     unit = tokens.get('flat', '').replace(" ", "").upper()
     numb = tokens.get('number', '').replace(" ", "").upper()
-    location = f"U{unit}/{numb}" if unit else numb
+    
+    if unit:
+        # If 'flat' starts with number, add the "U"
+        if unit[0].isdigit():
+            location = f"U{unit}/{numb}"
+        else:
+            location = f"{unit}/{numb}"
+    else:
+        location = numb
 
     # Standardize 'beside' tokens
     beside = re.sub(r'^the\s+kingsway', 'Kingsway', tokens.get('beside', ''), flags=re.I)
